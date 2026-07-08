@@ -69,6 +69,24 @@ pipeline {
             }
         }
 
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(credentials: ['ec2-ssh-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ec2-user@13.60.49.217 "
+                            docker pull chandrasai256/devops-demo:latest &&
+                            docker stop devops-demo || true &&
+                            docker rm devops-demo || true &&
+                            docker run -d \
+                              --name devops-demo \
+                              -p 8081:8081 \
+                              chandrasai256/devops-demo:latest
+                        "
+                    '''
+                }
+            }
+        }
+
     }
 
     post {
