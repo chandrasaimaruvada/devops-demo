@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn -B clean package -DskipTests
 
 # --- Run stage ---
-FROM eclipse-temurin:17-jre-alpine
+FROM FROM amazoncorretto:21
 WORKDIR /app
 COPY --from=build /app/target/devops-demo.jar app.jar
 EXPOSE 8081
