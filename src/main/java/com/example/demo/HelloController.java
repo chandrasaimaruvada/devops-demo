@@ -11,6 +11,11 @@ public class HelloController {
         return "Hello from the Jenkins -> Docker -> AWS EC2 pipeline demo!";
     }
 
+    @GetMapping("/hit")
+    public String message(){
+        return "You hit a sixer";
+    }
+
     @GetMapping("/version")
     public String version() {
         return "v1.0.0";
