@@ -2,12 +2,9 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USER   = 'yourdockerhubusername'          // <-- change me
-        IMAGE_NAME       = "${DOCKERHUB_USER}/devops-demo"
-        IMAGE_TAG        = "${env.BUILD_NUMBER}"
-        DEPLOY_HOST      = 'ec2-user@YOUR.EC2.PUBLIC.IP'     // <-- change me
-        CONTAINER_NAME   = 'devops-demo-app'
-        APP_PORT         = '8081'
+        DOCKERHUB_USER = 'chandrasaimaruvada'
+        IMAGE_NAME = "${DOCKERHUB_USER}/devops-demo"
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     options {
@@ -25,13 +22,13 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'mvn -B clean compile'
+                sh 'mvn clean compile'
             }
         }
 
         stage('Test') {
             steps {
-                sh 'mvn -B test'
+                sh 'mvn test'
             }
             post {
                 always {
@@ -42,62 +39,56 @@ pipeline {
 
         stage('Package') {
             steps {
-                sh 'mvn -B package -DskipTests'
-                archiveArtifacts artifacts: 'target/devops-demo.jar', fingerprint: true
+                sh 'mvn package -DskipTests'
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ."
+                sh """
+                docker build \
+                -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                -t ${IMAGE_NAME}:latest .
+                """
             }
         }
 
         stage('Docker Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
-                                                   usernameVariable: 'DH_USER',
-                                                   passwordVariable: 'DH_PASS')]) {
-                    sh '''
-                        echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${IMAGE_NAME}:latest
-                    '''
-                }
-            }
-        }
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
 
-        stage('Deploy to EC2') {
-            steps {
-                sshagent(credentials: ['ec2-ssh-key']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ${DEPLOY_HOST} "
-                            docker pull ${IMAGE_NAME}:latest &&
-                            docker stop ${CONTAINER_NAME} || true &&
-                            docker rm ${CONTAINER_NAME} || true &&
-                            docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:${APP_PORT} ${IMAGE_NAME}:latest
-                        "
-                    '''
-                }
-            }
-        }
+                    sh """
+                    echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
 
-        stage('Smoke Test') {
-            steps {
-                sh '''
-                    sleep 10
-                    curl -f http://YOUR.EC2.PUBLIC.IP:${APP_PORT}/version
-                '''
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${IMAGE_NAME}:latest
+
+                    docker logout
+                    """
+                }
             }
         }
     }
 
     post {
+
         success {
-            echo "Pipeline succeeded — build ${env.BUILD_NUMBER} deployed."
+            echo "✅ Build ${BUILD_NUMBER} completed successfully."
         }
+
         failure {
-            echo "Pipeline failed — check the stage logs above."
+            echo "❌ Pipeline failed."
+        }
+
+        always {
+            cleanWs()
         }
     }
 }
