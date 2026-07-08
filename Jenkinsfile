@@ -44,17 +44,7 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
-            steps {
-                sh """
-                docker build \
-                -t ${IMAGE_NAME}:${IMAGE_TAG} \
-                -t ${IMAGE_NAME}:latest .
-                """
-            }
-        }
-
-        stage('Docker Push') {
+        stage('Docker Build & Push') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -63,18 +53,22 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                    sh """
-                    echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                        docker buildx create --use --name mybuilder || true
+                        docker buildx inspect --bootstrap
 
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    docker push ${IMAGE_NAME}:latest
-
-                    docker logout
-                    """
+                        docker buildx build \
+                          --platform linux/amd64,linux/arm64 \
+                          -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                          -t ${IMAGE_NAME}:latest \
+                          --push .
+                    '''
                 }
             }
         }
+
     }
 
     post {
